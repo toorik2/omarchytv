@@ -45,16 +45,25 @@ public class HomeOverride extends AccessibilityService {
      * started, so the guard coalesces it with the Home press and OmarchyTV stays covered. Look again after this long.
      */
     private static final long RECHECK_MS = 1_500L;
+    /**
+     * When that re-opened stock home shows up as an event (it does, ~0.1 s after our start, coalesced by the guard),
+     * look again this soon instead of waiting the full RECHECK_MS: the stock home is then visible for ~0.4 s, not 1.5 s.
+     * RECHECK_MS stays as the fallback in case MainActivity hadn't paused yet at this point.
+     */
+    private static final long FAST_RECHECK_MS = 350L;
+    private final Runnable fastRecheck = () -> recheckNow();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastHomeEventAt, takeoverAt;
-    private final Runnable recheck = () -> {
+    private final Runnable recheck = this::recheckNow;
+
+    private void recheckNow() {
         long t = SystemClock.elapsedRealtime();
         // Only when the stock home came up again after our start and OmarchyTV is not in front (not an app the user
         // opened meanwhile: that shows no stock-home event).
         if (lastHomeEventAt <= takeoverAt || MainActivity.homeFront || t < passUntil || standDown()
                 || !guard.underLoopLimit(t)) return;
         takeOver(t);
-    };
+    }
 
     static boolean enabled() {
         return instance != null;
@@ -75,6 +84,7 @@ public class HomeOverride extends AccessibilityService {
     public boolean onUnbind(Intent intent) {
         instance = null;
         handler.removeCallbacks(recheck);
+        handler.removeCallbacks(fastRecheck);
         return super.onUnbind(intent);
     }
 
@@ -85,6 +95,11 @@ public class HomeOverride extends AccessibilityService {
         if (pkg == null || cls == null || !homes.contains(pkg + "/" + cls)) return;
         long now = SystemClock.elapsedRealtime();
         lastHomeEventAt = now;
+        if (takeoverAt > 0 && now > takeoverAt && now - takeoverAt < RECHECK_MS) {
+            // The stock home came back right after our takeover (Google TV's background-timeout reset): retake soon.
+            handler.removeCallbacks(fastRecheck);
+            handler.postDelayed(fastRecheck, FAST_RECHECK_MS);
+        }
         if (now < passUntil || standDown() || !guard.allow(pkg + "/" + cls, now)) return;
         takeOver(now);
     }
