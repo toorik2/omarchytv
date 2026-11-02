@@ -120,6 +120,13 @@ public class KeyMapService extends AccessibilityService {
                     break;
                 }
                 case LauncherConfig.KeyBinding.ACTION:
+                    if ("voice-search".equals(kb.value)) {
+                        // Note the app in front now: once the panel opens, the panel is in front.
+                        startActivity(new Intent(this, VoiceSearchActivity.class)
+                                .putExtra(VoiceSearchActivity.EXTRA_TARGET, VoiceSearchActivity.foregroundApp(this))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                        break;
+                    }
                     if ("dashboard".equals(kb.value)) {
                         // The TV's own side panel (Google TV dashboard). Its activity needs a system permission, so ask
                         // the system to open it: the notifications global action is that panel on (Google) TV.

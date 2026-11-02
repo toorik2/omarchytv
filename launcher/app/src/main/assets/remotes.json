@@ -33,6 +33,6 @@
         "default": "Opens the Google TV home (long press: dashboard panel)"
       }
     ],
-    "notes": "Verified on Google TV Streamer (kirkwood, Android 14) 2026-11-02: KeyMapService receives KEYCODE_HOME from this remote (18d1:9451 'Google TV Remote Keyboard') before PhoneWindowManager, so Home can open OmarchyTV without the stock home flashing. Long press: bind to intent:#Intent;action=android.app.action.TOGGLE_NOTIFICATION_HANDLER_PANEL;end for the Google TV dashboard."
+    "notes": "Verified on Google TV Streamer (kirkwood, Android 14) 2026-11-02: KeyMapService receives KEYCODE_HOME from this remote (18d1:9451 'Google TV Remote Keyboard') before PhoneWindowManager, so Home can open OmarchyTV without the stock home flashing. Long press: bind to intent:#Intent;action=android.app.action.TOGGLE_NOTIFICATION_HANDLER_PANEL;end for the Google TV dashboard. The mic key is ASSIST (key 217 in Vendor_18d1_Product_9451.kl): Android 14 handles it in interceptKeyBeforeQueueing, before accessibility, so KeyMapService can't take it; instead VoiceSearchActivity holds ACTION_ASSIST and OmarchyTV the Assistant role."
   }
 ]

@@ -111,12 +111,6 @@
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-            <!-- Lets OmarchyTV hold the Assistant role, so remotes whose mic key sends KEYCODE_ASSIST (handled by the
-                 system before any app, e.g. the SHIELD remote) open Walker instead of Google Assistant. -->
-            <intent-filter>
-                <action android:name="android.intent.action.ASSIST" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
             <!-- v2.14: remotes and keyboards that send a voice command or a long Search press open the Grok Bot
                  companion (voiceKey "companion", the default; Walker or Google Assistant when chosen). -->
             <intent-filter>
@@ -198,6 +192,25 @@
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden|navigation|uiMode"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.TvHome" />
+
+        <!-- Mic button → voice search in the current app (KeyMapService action "voice-search"). Own task so it floats
+             over the app you're in; not exported. -->
+        <!-- It also holds the Assistant role here (cmd role add-role-holder android.app.role.ASSISTANT com.omarchytv.home):
+             the Streamer remote's mic key is KEYCODE_ASSIST, which Android hands only to the role holder, before any
+             accessibility key filter sees it. (Upstream put ACTION_ASSIST on MainActivity for its voice companion;
+             moved here so the mic opens this panel over the current app instead of OmarchyTV's home.) -->
+        <activity
+            android:name=".VoiceSearchActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.DeviceDefault.Dialog.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <!-- v2.13: Grok Bot Companion (TV) chat, opened from the floating companion. Not exported. -->
         <activity
