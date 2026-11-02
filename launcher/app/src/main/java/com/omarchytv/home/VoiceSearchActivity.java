@@ -47,7 +47,8 @@ public class VoiceSearchActivity extends Activity {
             {"tv.twitch.android.app", "Twitch", "twitch://search?", null},
             {"com.netflix.ninja", "Netflix", "nflx://www.netflix.com/search?q=", null},
     };
-    private static final long RESET_SETTLE_MS = 1_200L;
+    /** Board → search gap. Measured: 0.2 s already clears Stremio's stuck search state; 1.2 s showed its home loading. */
+    private static final long RESET_SETTLE_MS = 300L;
     private String[] target = TARGETS[0];
     private static final int REQ_MIC = 1;
     private static final long FAIL_SHOW_MS = 1_800L;
