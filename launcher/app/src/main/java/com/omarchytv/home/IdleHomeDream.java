@@ -3,6 +3,7 @@ package com.omarchytv.home;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.service.dreams.DreamService;
 
@@ -18,7 +19,8 @@ import android.service.dreams.DreamService;
  * Apps that keep the screen on (a playing video) hold off the timeout as usual. It shows nothing and uses no network.
  * Settings: screensaver_components com.omarchytv.home/.IdleHomeDream, screensaver_enabled 1,
  * screensaver_activate_on_sleep 1, and secure sleep_timeout longer than system screen_off_timeout (or the system
- * sleeps without dreaming).
+ * sleeps without dreaming). On TVs the wake-up needs the TURN_SCREEN_ON app-op:
+ *   adb shell appops set com.omarchytv.home TURN_SCREEN_ON allow
  */
 public class IdleHomeDream extends DreamService {
 
@@ -28,6 +30,7 @@ public class IdleHomeDream extends DreamService {
     private static final long START_SETTLE_MS = 400L;
     /** Translucent but still dreaming for this long, so OmarchyTV's window shows and its turn-screen-on flag wakes. */
     private static final long WAKE_FINISH_MS = 1_500L;
+    private static final long WAKE_HOLD_MS = 3_000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean idleWake;
@@ -48,7 +51,10 @@ public class IdleHomeDream extends DreamService {
             finish();
             return;
         }
-        Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setClass(this, MainActivity.class)
+        // No CATEGORY_HOME: on Android 14 a MAIN/HOME start makes this a home-type activity and OmarchyTV the
+        // "home process", which takes the home-app launch exemption away from the stock launcher, so its remote
+        // buttons (YouTube, Netflix, the star key) are then blocked as background launches.
+        Intent i = new Intent(Intent.ACTION_MAIN).setClass(this, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                 .putExtra(MainActivity.EXTRA_IDLE_WAKE, true);
         try {
@@ -58,10 +64,27 @@ public class IdleHomeDream extends DreamService {
             return;
         }
         idleWake = true;
-        // Ending a screensaver after the idle timeout means sleep, and app wake locks can't wake the TV from it.
-        // wakeUp() makes this window translucent first: OmarchyTV's window then shows while the TV is still dreaming,
-        // and the window manager wakes the TV for its turn-screen-on flag (MainActivity.wakeFromIdle).
-        handler.postDelayed(this::wakeUp, START_SETTLE_MS);
+        handler.postDelayed(this::wake, START_SETTLE_MS);
+    }
+
+    /**
+     * Ending a screensaver after the idle timeout means sleep: as soon as it starts waking, the power manager puts the
+     * TV to sleep unless something woke it first. ACQUIRE_CAUSES_WAKEUP wakes it straight from dreaming (and restarts
+     * the idle timer), but on TVs only with the TURN_SCREEN_ON app-op. Without it, the fallback is the gentle wake:
+     * wakeUp() turns this window translucent and OmarchyTV's turn-screen-on window wakes the TV
+     * (MainActivity.wakeFromIdle), which can lose the race against the sleep.
+     */
+    @SuppressWarnings("deprecation")
+    private void wake() {
+        try {
+            PowerManager pm = getSystemService(PowerManager.class);
+            PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                    | PowerManager.ACQUIRE_CAUSES_WAKEUP, "omarchytv:idle-home");
+            wl.setReferenceCounted(false);
+            wl.acquire(WAKE_HOLD_MS);
+        } catch (RuntimeException ignored) {   // the fallback below
+        }
+        wakeUp();
     }
 
     @Override

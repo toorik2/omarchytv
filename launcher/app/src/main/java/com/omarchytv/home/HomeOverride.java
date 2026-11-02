@@ -66,7 +66,10 @@ public class HomeOverride extends AccessibilityService {
         if (pkg == null || cls == null || !homes.contains(pkg + "/" + cls)) return;
         long now = SystemClock.elapsedRealtime();
         if (now < passUntil || standDown() || !guard.allow(pkg + "/" + cls, now)) return;
-        Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setClass(this, MainActivity.class)
+        // No CATEGORY_HOME: on Android 14 a MAIN/HOME start makes this a home-type activity and OmarchyTV the
+        // "home process", which takes the home-app launch exemption away from the stock launcher, so its remote
+        // buttons (YouTube, Netflix, the star key) are then blocked as background launches.
+        Intent i = new Intent(Intent.ACTION_MAIN).setClass(this, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
         try {
             startActivity(i);

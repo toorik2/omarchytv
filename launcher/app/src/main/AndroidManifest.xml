@@ -79,6 +79,10 @@
     </queries>
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- IdleHomeDream wakes the TV after opening OmarchyTV (ACQUIRE_CAUSES_WAKEUP, held 3 s). On TVs the wake-up
+         also needs the TURN_SCREEN_ON app-op (signature|privileged|appop): appops set <pkg> TURN_SCREEN_ON allow. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
 
     <application
         android:name=".OmarchyApp"
