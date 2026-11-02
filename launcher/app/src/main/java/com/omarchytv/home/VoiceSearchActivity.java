@@ -10,6 +10,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Process;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
@@ -34,13 +36,18 @@ public class VoiceSearchActivity extends Activity {
     static final String YOUTUBE = "com.google.android.youtube.tv";
     static final String EXTRA_TARGET = "com.omarchytv.home.extra.SEARCH_TARGET";
 
-    /** {package, label, search URI prefix (the query is appended URI-encoded)}; verified on a Google TV Streamer. */
+    /**
+     * {package, label, search URI prefix (the query is appended URI-encoded), URI to open first or null}; verified on
+     * a Google TV Streamer. Stremio doesn't reload a search link that arrives while its search page is already open
+     * (endless spinner), so it goes to its board first.
+     */
     private static final String[][] TARGETS = {
-            {YOUTUBE, "YouTube", "https://www.youtube.com/results?search_query="},
-            {"com.stremio.one", "Stremio", "stremio:///search?search="},
-            {"tv.twitch.android.app", "Twitch", "twitch://search?"},
-            {"com.netflix.ninja", "Netflix", "nflx://www.netflix.com/search?q="},
+            {YOUTUBE, "YouTube", "https://www.youtube.com/results?search_query=", null},
+            {"com.stremio.one", "Stremio", "stremio:///search?search=", "stremio:///board"},
+            {"tv.twitch.android.app", "Twitch", "twitch://search?", null},
+            {"com.netflix.ninja", "Netflix", "nflx://www.netflix.com/search?q=", null},
     };
+    private static final long RESET_SETTLE_MS = 1_200L;
     private String[] target = TARGETS[0];
     private static final int REQ_MIC = 1;
     private static final long FAIL_SHOW_MS = 1_800L;
@@ -136,7 +143,21 @@ public class VoiceSearchActivity extends Activity {
                 .setPackage(target[0])
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
-            startActivity(i);
+            if (target[3] != null) {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(target[3])).setPackage(target[0])
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                // Outlives this panel (it stops as the app comes up); allowed as a background start because
+                // OmarchyTV's accessibility services are bound.
+                Context app = getApplicationContext();
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    try {
+                        app.startActivity(i);
+                    } catch (RuntimeException ignored) {
+                    }
+                }, RESET_SETTLE_MS);
+            } else {
+                startActivity(i);
+            }
         } catch (RuntimeException e) {
             done = false;
             fail(target[1] + " is not available");
