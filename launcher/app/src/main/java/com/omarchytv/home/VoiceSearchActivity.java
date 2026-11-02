@@ -250,8 +250,10 @@ public class VoiceSearchActivity extends Activity {
             String fg = null;
             while (ev.hasNextEvent()) {
                 ev.getNextEvent(e);
-                // Skip ourselves: as the Assistant this panel may already be the newest foreground event.
-                if (e.getEventType() == UsageEvents.Event.MOVE_TO_FOREGROUND && !c.getPackageName().equals(e.getPackageName()))
+                // Skip only this panel (as the Assistant it may already be the newest foreground event); OmarchyTV's own
+                // screens count, so on its home the mic falls back to YouTube instead of the app used before it.
+                if (e.getEventType() == UsageEvents.Event.MOVE_TO_FOREGROUND
+                        && !VoiceSearchActivity.class.getName().equals(e.getClassName()))
                     fg = e.getPackageName();
             }
             return fg;
