@@ -1635,6 +1635,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener, T
             case "menu": return str(R.string.keys_action_menu);
             case "screensaver": return str(R.string.keys_action_screensaver);
             case "next-theme": return str(R.string.keys_action_next_theme);
+            case "dashboard": return str(R.string.keys_action_dashboard);
             default: return id;
         }
     }

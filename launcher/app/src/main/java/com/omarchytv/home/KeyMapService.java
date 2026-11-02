@@ -47,6 +47,12 @@ public class KeyMapService extends AccessibilityService {
     @Override
     protected boolean onKeyEvent(KeyEvent e) {
         int code = e.getKeyCode();
+        // Home goes back to the TV once the crash watchdog gave the home screen back or in Originale mode, the same rule
+        // as HomeOverride.standDown() (upstream PR #104): a crash-looping OmarchyTV must not keep being reopened.
+        if (code == KeyEvent.KEYCODE_HOME && (Watchdog.crashedTooOften(this) || Originale.isOriginal(this))) {
+            if (code == activeKey) reset();
+            return false;
+        }
         LauncherConfig.KeyBinding[] b = LauncherConfig.get(this).keys.get(code);
         if (b != null && !RemoteProfiles.handles(this, e)) b = null;   // only profiled buttons of known remotes
         if (b == null) {
@@ -114,6 +120,12 @@ public class KeyMapService extends AccessibilityService {
                     break;
                 }
                 case LauncherConfig.KeyBinding.ACTION:
+                    if ("dashboard".equals(kb.value)) {
+                        // The TV's own side panel (Google TV dashboard). Its activity needs a system permission, so ask
+                        // the system to open it: the notifications global action is that panel on (Google) TV.
+                        performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS);
+                        break;
+                    }
                     startActivity(new Intent(this, MainActivity.class).putExtra(MainActivity.EXTRA_ACTION, kb.value)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                     break;
