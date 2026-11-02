@@ -19,6 +19,7 @@
     <string name="walker_hint">alle  ·  %1$d installiert</string>
     <string name="dream_name">OmarchyTV Uhr</string>
     <string name="dream_omarchy">OmarchyTV</string>
+    <string name="dream_idle_home">OmarchyTV: Leerlauf → Home, dann Standby</string>
     <string name="menu_launcher">Launcher-Einstellungen</string>
     <string name="menu_wallpaper">Hintergrund</string>
     <string name="menu_reorder">Apps anordnen</string>

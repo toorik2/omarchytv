@@ -5,6 +5,7 @@
     <string name="brand_short" translatable="false">[otv]</string>
     <string name="prompt" translatable="false">user@omarchytv:~$</string>
     <string name="dream_omarchy">OmarchyTV</string>
+    <string name="dream_idle_home">OmarchyTV: idle → home, then sleep</string>
     <string name="inputs">Inputs</string>
     <string name="wifi">Wi-Fi</string>
     <string name="settings">Settings</string>

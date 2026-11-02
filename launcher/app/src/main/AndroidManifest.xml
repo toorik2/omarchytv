@@ -307,6 +307,19 @@
                 android:resource="@xml/keymap_accessibility" />
         </service>
 
+        <!-- Optional screensaver for TVs that keep their own home (Google TV): after the idle timeout another app
+             gives way to OmarchyTV; idle again on OmarchyTV, the TV sleeps. -->
+        <service
+            android:name=".IdleHomeDream"
+            android:label="@string/dream_idle_home"
+            android:exported="true"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
         <service
             android:name=".ClockDream"
             android:enabled="false"

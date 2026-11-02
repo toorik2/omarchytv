@@ -148,6 +148,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener, T
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Watchdog.install(this);
+        wakeFromIdle(getIntent());
         setContentView(R.layout.activity_main);
         Theme.apply(getWindow().getDecorView());
         // Lights hub only while OmarchyTV is on screen; the snapshot ("Restore previous") is queued before the paint.
@@ -846,6 +847,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener, T
     }
 
     private boolean resumed, linkRefreshing, linkConfigPending;
+    /** For IdleHomeDream: the home screen is in front / when it last left the front (elapsedRealtime). */
+    static volatile boolean homeFront;
+    static volatile long homeLeftAt;
+    /** IdleHomeDream opens the home with this extra: turn the screen on as the window shows over the screensaver. */
+    static final String EXTRA_IDLE_WAKE = "com.omarchytv.home.extra.IDLE_WAKE";
+
+    /**
+     * The window manager wakes the TV when a turn-screen-on window shows while it is dreaming, which also restarts the
+     * idle timer (an app wake lock can't: screen wake locks are ignored while dreaming). Cleared again after a few
+     * seconds so the home never wakes the TV on its own later.
+     */
+    private void wakeFromIdle(Intent i) {
+        if (i == null || !i.getBooleanExtra(EXTRA_IDLE_WAKE, false)) return;
+        i.removeExtra(EXTRA_IDLE_WAKE);
+        if (android.os.Build.VERSION.SDK_INT < 27) return;
+        setTurnScreenOn(true);
+        handler.postDelayed(() -> setTurnScreenOn(false), 5_000L);
+    }
     private String pendingSourcesId;
     /** "> omarchy" shortcuts section (between apps and "> tv"). */
     private ShortcutAdapter sc;
@@ -975,6 +994,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener, T
         }
         builtWith = cfg;
         resumed = true;
+        homeFront = true;
         // KEYCODE_ASSIST never reaches dispatchKeyEvent: the system starts the Assistant role holder instead. With
         // OmarchyTV holding that role, the mic key lands here: the Grok Bot companion by voice ("voiceKey": "companion",
         // the default) or Walker ("launcher"; pressed again while Walker is open it starts voice search).
@@ -1055,6 +1075,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener, T
         super.onPause();
         if (companion != null) { companion.setArmed(false); companion.stop(); }
         resumed = false;
+        homeFront = false;
+        homeLeftAt = android.os.SystemClock.elapsedRealtime();
         OmarchyLink.setHomeVisible(false);
         handler.removeCallbacks(idle);
         handler.removeCallbacks(minuteTick);
@@ -3703,6 +3725,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener, T
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);   // HOME pressed while on home: wake up from the screensaver
+        wakeFromIdle(intent);
         if (intent.getBooleanExtra(HomeCheck.EXTRA_ASK, false)) setIntent(intent);   // HomeCheck from boot
         if (Intent.ACTION_ASSIST.equals(intent.getAction())) setIntent(intent);   // mic key, handled in onResume
         hideSaver();
