@@ -16,8 +16,13 @@ import android.os.Process;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.graphics.PixelFormat;
+import android.os.Build;
+import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
+import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -45,10 +50,18 @@ public class VoiceSearchActivity extends Activity {
             {YOUTUBE, "YouTube", "https://www.youtube.com/results?search_query=", null},
             {"com.stremio.one", "Stremio", "stremio:///search?search=", "stremio:///board"},
             {"tv.twitch.android.app", "Twitch", "twitch://search?", null},
-            {"com.netflix.ninja", "Netflix", "nflx://www.netflix.com/search?q=", null},
+            // Netflix takes no search from outside: no search deep link (its TV UI ignores /search?q=), and its own
+            // voice search only accepts recognizer results it asked for itself. Say so instead of failing silently.
+            {"com.netflix.ninja", "Netflix", null, null},
     };
-    /** Board → search gap. Measured: 0.2 s already clears Stremio's stuck search state; 1.2 s showed its home loading. */
-    private static final long RESET_SETTLE_MS = 300L;
+    /**
+     * Board → search gap. Stremio needs a variable fraction of a second to leave its search page: 0.36 s between its
+     * own relaunches worked, 0.32 s got stuck, 1.2 s always worked. So use a safe gap, and hide it behind a full-screen
+     * cover (overlay, needs "display over other apps") so neither the board nor a spinner is seen.
+     */
+    private static final long RESET_SETTLE_MS = 1_100L;
+    /** The cover stays this long after the search link: Stremio shows results about 1 s after it. */
+    private static final long COVER_AFTER_MS = 1_000L;
     private String[] target = TARGETS[0];
     private static final int REQ_MIC = 1;
     private static final long FAIL_SHOW_MS = 1_800L;
@@ -69,12 +82,20 @@ public class VoiceSearchActivity extends Activity {
         box.setBackgroundColor(0xF01A1B26);
         status = text(26, 0xFFC0CAF5);
         heard = text(22, 0xFF7AA2F7);
+        box.addView(status);
+        box.addView(heard);
         String fg = getIntent().getStringExtra(EXTRA_TARGET);
         if (fg == null) fg = foregroundApp(this);   // opened by the mic key as the Assistant: the app we came from
         for (String[] t : TARGETS) if (t[0].equals(fg)) target = t;
+        if (target[2] == null) {   // the app can't be given a search from outside
+            done = true;
+            status.setText(target[1] + " doesn't take outside searches");
+            heard.setText("Use the 🎤 on " + target[1] + "'s own search screen");
+            setContentView(box);
+            status.postDelayed(this::finish, 3_500L);
+            return;
+        }
         status.setText("🎤  " + target[1] + " search: listening…");
-        box.addView(status);
-        box.addView(heard);
         setContentView(box);
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
@@ -145,17 +166,20 @@ public class VoiceSearchActivity extends Activity {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             if (target[3] != null) {
+                Context app = getApplicationContext();
+                View cover = showCover(app, "🔎  Searching " + target[1] + " for \u201c" + query + "\u201d…");
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(target[3])).setPackage(target[0])
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 // Outlives this panel (it stops as the app comes up); allowed as a background start because
                 // OmarchyTV's accessibility services are bound.
-                Context app = getApplicationContext();
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                Handler h = new Handler(Looper.getMainLooper());
+                h.postDelayed(() -> {
                     try {
                         app.startActivity(i);
                     } catch (RuntimeException ignored) {
                     }
                 }, RESET_SETTLE_MS);
+                if (cover != null) h.postDelayed(() -> hideCover(app, cover), RESET_SETTLE_MS + COVER_AFTER_MS);
             } else {
                 startActivity(i);
             }
@@ -165,6 +189,45 @@ public class VoiceSearchActivity extends Activity {
             return;
         }
         finish();
+    }
+
+    /**
+     * A full-screen card over every app (TYPE_APPLICATION_OVERLAY), shown while the target app is steered behind it.
+     * Not focusable or touchable, so remote keys still reach the app. Null without "display over other apps"
+     * (appops set com.omarchytv.home SYSTEM_ALERT_WINDOW allow): the steering is then simply visible.
+     */
+    private static View showCover(Context app, String message) {
+        if (Build.VERSION.SDK_INT < 26 || !Settings.canDrawOverlays(app)) return null;
+        try {
+            WindowManager wm = app.getSystemService(WindowManager.class);
+            LinearLayout box = new LinearLayout(app);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setGravity(Gravity.CENTER);
+            box.setBackgroundColor(0xFF1A1B26);
+            TextView t = new TextView(app);
+            t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
+            t.setTextColor(0xFFC0CAF5);
+            t.setGravity(Gravity.CENTER);
+            t.setText(message);
+            box.addView(t);
+            WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    PixelFormat.OPAQUE);
+            wm.addView(box, lp);
+            return box;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static void hideCover(Context app, View cover) {
+        try {
+            app.getSystemService(WindowManager.class).removeView(cover);
+        } catch (RuntimeException ignored) {
+        }
     }
 
     /**

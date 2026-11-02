@@ -83,6 +83,9 @@
          also needs the TURN_SCREEN_ON app-op (signature|privileged|appop): appops set <pkg> TURN_SCREEN_ON allow. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
+    <!-- VoiceSearchActivity: a ~2 s full-screen "Searching…" cover while it steers Stremio past its stuck-search bug.
+         Only works with the app-op granted (appops set com.omarchytv.home SYSTEM_ALERT_WINDOW allow). -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:name=".OmarchyApp"
