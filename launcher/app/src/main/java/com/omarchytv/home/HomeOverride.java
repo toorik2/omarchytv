@@ -5,6 +5,8 @@ import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.view.accessibility.AccessibilityEvent;
 
@@ -37,6 +39,22 @@ public class HomeOverride extends AccessibilityService {
     private final Set<String> homes = new HashSet<>();
     /** Double events per Home press (Fire OS) count once; loop guard of 4 takeovers in 15 s (issue #58). */
     private final TakeoverGuard guard = new TakeoverGuard();
+    /**
+     * Google TV's launcher re-opens its own home once when it comes back after a long time in the background
+     * (BootModeAppToForeground: "Background timeout reached, starting home intent"), tens of ms after OmarchyTV was
+     * started, so the guard coalesces it with the Home press and OmarchyTV stays covered. Look again after this long.
+     */
+    private static final long RECHECK_MS = 1_500L;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private long lastHomeEventAt, takeoverAt;
+    private final Runnable recheck = () -> {
+        long t = SystemClock.elapsedRealtime();
+        // Only when the stock home came up again after our start and OmarchyTV is not in front (not an app the user
+        // opened meanwhile: that shows no stock-home event).
+        if (lastHomeEventAt <= takeoverAt || MainActivity.homeFront || t < passUntil || standDown()
+                || !guard.underLoopLimit(t)) return;
+        takeOver(t);
+    };
 
     static boolean enabled() {
         return instance != null;
@@ -56,6 +74,7 @@ public class HomeOverride extends AccessibilityService {
     @Override
     public boolean onUnbind(Intent intent) {
         instance = null;
+        handler.removeCallbacks(recheck);
         return super.onUnbind(intent);
     }
 
@@ -65,7 +84,12 @@ public class HomeOverride extends AccessibilityService {
         CharSequence pkg = e.getPackageName(), cls = e.getClassName();
         if (pkg == null || cls == null || !homes.contains(pkg + "/" + cls)) return;
         long now = SystemClock.elapsedRealtime();
+        lastHomeEventAt = now;
         if (now < passUntil || standDown() || !guard.allow(pkg + "/" + cls, now)) return;
+        takeOver(now);
+    }
+
+    private void takeOver(long now) {
         // No CATEGORY_HOME: on Android 14 a MAIN/HOME start makes this a home-type activity and OmarchyTV the
         // "home process", which takes the home-app launch exemption away from the stock launcher, so its remote
         // buttons (YouTube, Netflix, the star key) are then blocked as background launches.
@@ -74,6 +98,9 @@ public class HomeOverride extends AccessibilityService {
         try {
             startActivity(i);
             guard.started(now);
+            takeoverAt = now;
+            handler.removeCallbacks(recheck);
+            handler.postDelayed(recheck, RECHECK_MS);
         } catch (RuntimeException ignored) {   // the system refused the start: the stock home stays, nothing else
         }
     }

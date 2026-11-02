@@ -30,6 +30,12 @@ final class TakeoverGuard {
         return oldest == 0 || now - oldest >= LOOP_MS;
     }
 
+    /** Loop guard only (no coalescing), for HomeOverride's re-check after a takeover. */
+    synchronized boolean underLoopLimit(long now) {
+        long oldest = recent[next];
+        return oldest == 0 || now - oldest >= LOOP_MS;
+    }
+
     /** OmarchyTV was started at now: count it against the loop guard. */
     synchronized void started(long now) {
         recent[next] = now;
