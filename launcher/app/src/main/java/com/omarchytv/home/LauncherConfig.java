@@ -285,6 +285,10 @@ final class LauncherConfig {
 
     /** omarchytv.json "barWeather": true puts icon + temperature in the bar, left of the status icons (default off). */
     final boolean barWeather;
+    /** omarchytv.json "barDate": SimpleDateFormat pattern for the bar date, e.g. "EEE dd.MM.yyyy"; empty = "mon 2 nov". */
+    final String barDate;
+    /** omarchytv.json "cursorBlink": false keeps the home prompt cursor solid (default true, blinking). */
+    final boolean cursorBlink;
 
     /**
      * Panes the TV fetches itself (omarchytv.json "remotePanes": {"url": "https://…", "refreshSec": 300}): same
@@ -647,6 +651,9 @@ final class LauncherConfig {
         remotePanesUrl = RemotePanes.urlAllowed(rpUrl) ? rpUrl : "";
         remotePanesRefreshSec = rp != null ? (int) clamp(rp.optInt("refreshSec", 300), 300, 86_400) : 300;
         barWeather = j != null && j.optBoolean("barWeather", false);
+        String bd = j != null ? j.optString("barDate", "").trim() : "";
+        barDate = bd.length() <= 32 ? bd : "";
+        cursorBlink = j == null || j.optBoolean("cursorBlink", true);
         JSONObject wx = j != null ? j.optJSONObject("weather") : null;
         weatherLat = wx != null ? wx.optDouble("lat", Double.NaN) : Double.NaN;
         weatherLon = wx != null ? wx.optDouble("lon", Double.NaN) : Double.NaN;

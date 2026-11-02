@@ -632,7 +632,14 @@ final class HomeV29 extends FrameLayout {
     void refresh() {
         if (cfg == null) return;
         Locale loc = !"auto".equals(cfg.language) && !cfg.language.isEmpty() ? new Locale(cfg.language) : Locale.getDefault();
-        String d = new SimpleDateFormat("EEE d MMM", loc).format(new Date()).replace(".", "").toLowerCase(loc);
+        String d = null;
+        if (!cfg.barDate.isEmpty()) {
+            try {
+                d = new SimpleDateFormat(cfg.barDate, loc).format(new Date());   // as written, e.g. "Mon 02.11.2026"
+            } catch (IllegalArgumentException ignored) {   // bad pattern: the default below
+            }
+        }
+        if (d == null) d = new SimpleDateFormat("EEE d MMM", loc).format(new Date()).replace(".", "").toLowerCase(loc);
         String h = new SimpleDateFormat(android.text.format.DateFormat.is24HourFormat(act) ? "HH:mm" : "h:mm a", loc).format(new Date());
         clock.setText(d + "  " + h);
         long up = SystemClock.elapsedRealtime() / 60_000L;
@@ -964,7 +971,7 @@ final class HomeV29 extends FrameLayout {
         int st = promptText.getSpanStart(cursorSpan), en = promptText.getSpanEnd(cursorSpan);
         if (st < 0) return;
         promptText.removeSpan(cursorSpan);
-        cursorSpan = new ForegroundColorSpan(on ? t.fg : Color.TRANSPARENT);
+        cursorSpan = new ForegroundColorSpan(on || (cfg != null && !cfg.cursorBlink) ? t.fg : Color.TRANSPARENT);
         promptText.setSpan(cursorSpan, st, en, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         termPrompt.setText(promptText, TextView.BufferType.SPANNABLE);
         if (grokbotBox.getVisibility() == VISIBLE) {
